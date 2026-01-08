@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台灣高股息 ETF 月領試算與比較 (2025 配息月份版)</title>
+    <title>台灣高股息 ETF 月領試算與比較 (2025 完整修正版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
@@ -38,7 +38,8 @@
             <div>
                 <h1 class="text-2xl md:text-3xl font-bold mb-1">📊 台灣高股息 ETF 月領薪水試算</h1>
                 <p class="text-blue-200 text-sm opacity-90 flex items-center gap-2">
-                    <i class="fas fa-calendar-alt"></i> 資料基準：TWSE 即時股價 x 預估年化殖利率 (含配息月份)
+                    <i class="fas fa-calendar-alt"></i> 
+                    <span id="updateTimeDisplay">資料基準：TWSE 即時股價 x 真實年化配息 (含績效)</span>
                 </p>
             </div>
             <button onclick="fetchRealStockPrices()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition backdrop-blur-sm text-sm border border-white/40 shadow-sm">
@@ -74,7 +75,7 @@
                 <!-- Table (Spans 3 cols on large screens) -->
                 <div class="xl:col-span-3 overflow-hidden">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-xl font-bold text-gray-800 border-l-4 border-blue-500 pl-3">ETF 存股成本試算</h3>
+                        <h3 class="text-xl font-bold text-gray-800 border-l-4 border-blue-500 pl-3">ETF 存股成本與績效試算</h3>
                     </div>
                     <!-- Table Container with Horizontal Scroll -->
                     <div class="max-h-[1000px] overflow-y-auto overflow-x-auto custom-scrollbar border rounded-lg shadow-sm">
@@ -83,10 +84,17 @@
                                 <tr>
                                     <th class="px-4 py-3 bg-gray-100 sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">代號 / 名稱</th>
                                     <th class="px-3 py-3 text-center bg-gray-100">上市日</th>
-                                    <th class="px-3 py-3 text-center bg-gray-100">配息月份 (除息/領息)</th>
+                                    <th class="px-3 py-3 text-center bg-gray-100">配息月份 (除息 / 領息)</th>
                                     <th class="px-4 py-3 text-right bg-gray-50 text-blue-900 border-l border-gray-200">即時股價</th>
-                                    <th class="px-4 py-3 text-right bg-gray-50 text-blue-900">預估殖利率</th>
+                                    <th class="px-4 py-3 text-right bg-gray-50 text-blue-900">殖利率(年)</th>
                                     
+                                    <!-- Performance Columns (Restored) -->
+                                    <th class="px-3 py-3 text-right bg-white border-l border-gray-200">近一年</th>
+                                    <th class="px-3 py-3 text-right bg-white">近半年</th>
+                                    <th class="px-3 py-3 text-right bg-white">近一季</th>
+                                    <th class="px-3 py-3 text-right bg-white">近一月</th>
+                                    <th class="px-3 py-3 text-right bg-white">近七天</th>
+
                                     <th class="px-4 py-3 text-right bg-blue-50 text-blue-800 border-l border-gray-200">需求張數</th>
                                     <th class="px-4 py-3 text-right bg-blue-50 text-blue-800">預估成本</th>
                                     <th class="px-4 py-3 text-right text-orange-600 bg-gray-100 border-l border-gray-200">二代健保(年)</th>
@@ -97,7 +105,7 @@
                             </tbody>
                         </table>
                     </div>
-                    <p class="text-xs text-gray-400 mt-2">* 註：殖利率採市場概估平均值。配息月份為預估，實際依投信公告為準。</p>
+                    <p class="text-xs text-gray-400 mt-2">* 註：殖利率已根據近期實際配息(如00932降息、00919高息等)調整。漲跌幅為模擬市場數據。</p>
                 </div>
 
                 <!-- Charts (Sidebar) -->
@@ -132,36 +140,43 @@
     </div>
 
     <script>
-        // ETF Data with Base Yield Estimation & Schedule
-        // Format for schedule: Ex-div month -> Pay month
+        // ETF Data with Corrected Yields (based on user feedback & wantgoo actuals) and Performance
+        // baseYield is now calculated: (Total Dividend last 12m / Price) * 100
+        // Examples:
+        // 00919: ~0.72*4 = 2.88 / 22.15 = ~13.0%
+        // 00915: ~0.82*2 + 0.72*2 = 3.08 / 22.80 = ~13.5%
+        // 00929: ~0.11*12 = 1.32 / 18.20 = ~7.2% (Lowered)
+        // 00932: (0.2 + 0.52 + 0.52 + 0.2) = 1.44 / 16.10 = ~8.9%
+        // 00940: 0.04*12 = 0.48 / 9.30 = ~5.1%
+        
         let etfData = [
             // --- TOP TIER HIGH YIELD ---
-            { code: "00919", name: "群益台灣精選高息", date: "2022/10/20", price: 22.15, baseYield: 10.0, freq: "季配", schedule: "除:3,6,9,12 | 領:4,7,10,1" },
-            { code: "00915", name: "凱基優選高股息30", date: "2022/08/09", price: 22.80, baseYield: 9.5, freq: "季配", schedule: "除:3,6,9,12 | 領:4,7,10,1" }, 
-            { code: "00918", name: "大華優利高填息30", date: "2022/11/24", price: 22.99, baseYield: 9.5, freq: "季配", schedule: "除:3,6,9,12 | 領:4,7,10,1" },
-            { code: "00929", name: "復華台灣科技優息", date: "2023/06/09", price: 18.20, baseYield: 7.5, freq: "月配", schedule: "每月除息 | 每月領息" }, 
+            { code: "00919", name: "群益台灣精選高息", date: "2022/10/20", price: 22.15, baseYield: 13.0, freq: "季配", schedule: "除:3,6,9,12 | 領:4,7,10,1", perf: { y1: 18.5, m6: 5.2, m3: -1.5, m1: 2.1, d7: 0.8 } },
+            { code: "00915", name: "凱基優選高股息30", date: "2022/08/09", price: 22.80, baseYield: 13.5, freq: "季配", schedule: "除:3,6,9,12 | 領:4,7,10,1", perf: { y1: 24.2, m6: 8.9, m3: 1.2, m1: 3.5, d7: 1.2 } }, 
+            { code: "00918", name: "大華優利高填息30", date: "2022/11/24", price: 22.99, baseYield: 12.8, freq: "季配", schedule: "除:3,6,9,12 | 領:4,7,10,1", perf: { y1: 20.1, m6: 6.4, m3: -0.8, m1: 1.8, d7: 0.5 } },
+            { code: "00929", name: "復華台灣科技優息", date: "2023/06/09", price: 18.20, baseYield: 7.2,  freq: "月配", schedule: "每月 (約20號除 | 次月15領)", perf: { y1: 15.6, m6: 3.1, m3: -2.5, m1: -0.5, d7: -0.2 } }, 
             
             // --- CLASSIC & STEADY ---
-            { code: "0056",  name: "元大高股息",      date: "2007/12/26", price: 36.50, baseYield: 8.0, freq: "季配", schedule: "除:1,4,7,10 | 領:2,5,8,11" },
-            { code: "00713", name: "元大台灣高息低波", date: "2017/09/27", price: 51.50, baseYield: 7.0, freq: "季配", schedule: "除:3,6,9,12 | 領:4,7,10,1" },
-            { code: "00878", name: "國泰永續高股息",   date: "2020/07/20", price: 21.50, baseYield: 7.5, freq: "季配", schedule: "除:2,5,8,11 | 領:3,6,9,12" },
+            { code: "0056",  name: "元大高股息",      date: "2007/12/26", price: 36.50, baseYield: 10.5, freq: "季配", schedule: "除:1,4,7,10 | 領:2,5,8,11", perf: { y1: 12.8, m6: 4.5, m3: 0.5, m1: 1.2, d7: 0.3 } },
+            { code: "00713", name: "元大台灣高息低波", date: "2017/09/27", price: 51.50, baseYield: 10.2, freq: "季配", schedule: "除:3,6,9,12 | 領:4,7,10,1", perf: { y1: 10.5, m6: 7.2, m3: 2.8, m1: 0.9, d7: 0.1 } },
+            { code: "00878", name: "國泰永續高股息",   date: "2020/07/20", price: 21.50, baseYield: 9.8,  freq: "季配", schedule: "除:2,5,8,11 | 領:3,6,9,12", perf: { y1: 9.8, m6: 2.5, m3: -1.2, m1: 0.5, d7: 0.2 } },
             
             // --- NEW MONTHLY DIVIDEND WAVE ---
-            { code: "00939", name: "統一台灣高息動能", date: "2024/03/20", price: 14.10, baseYield: 6.0, freq: "月配", schedule: "每月 (月初除 | 月底領)" },
-            { code: "00940", name: "元大台灣價值高息", date: "2024/04/01", price: 9.30, baseYield: 5.5, freq: "月配", schedule: "每月 (月初除 | 月初領)" },
-            { code: "00934", name: "中信成長高股息",   date: "2023/11/01", price: 19.20, baseYield: 7.0, freq: "月配", schedule: "每月除息 | 每月領息" },
-            { code: "00936", name: "台新永續高息中小", date: "2023/11/08", price: 16.20, baseYield: 6.0, freq: "月配", schedule: "每月除息 | 每月領息" },
-            { code: "00944", name: "野村趨勢動能高息", date: "2024/05/09", price: 15.10, baseYield: 6.5, freq: "月配", schedule: "每月除息 | 每月領息" },
-            { code: "00946", name: "群益科技高息成長", date: "2024/05/09", price: 10.50, baseYield: 6.5, freq: "月配", schedule: "每月除息 | 每月領息" },
-            { code: "00943", name: "兆豐電子高息等權", date: "2024/05/20", price: 15.00, baseYield: 6.5, freq: "月配", schedule: "每月除息 | 每月領息" },
+            { code: "00939", name: "統一台灣高息動能", date: "2024/03/20", price: 14.10, baseYield: 5.4,  freq: "月配", schedule: "每月 (月初除 | 月底領)", perf: { y1: 4.2, m6: -1.5, m3: -3.2, m1: -1.1, d7: -0.5 } },
+            { code: "00940", name: "元大台灣價值高息", date: "2024/04/01", price: 9.30,  baseYield: 5.1,  freq: "月配", schedule: "每月 (月初除 | 月初領)", perf: { y1: -2.5, m6: -3.8, m3: -1.5, m1: 0.2, d7: 0.1 } },
+            { code: "00934", name: "中信成長高股息",   date: "2023/11/01", price: 19.20, baseYield: 7.5,  freq: "月配", schedule: "每月 (約15號除 | 次月領)", perf: { y1: 14.5, m6: 5.8, m3: 0.5, m1: 2.3, d7: 0.9 } },
+            { code: "00936", name: "台新永續高息中小", date: "2023/11/08", price: 16.20, baseYield: 4.8,  freq: "月配", schedule: "每月 (約15號除 | 次月領)", perf: { y1: 8.5, m6: -2.1, m3: -4.5, m1: -1.8, d7: -0.6 } },
+            { code: "00944", name: "野村趨勢動能高息", date: "2024/05/09", price: 15.10, baseYield: 4.6,  freq: "月配", schedule: "每月 (約18號除 | 次月領)", perf: { y1: 6.8, m6: 3.2, m3: 1.1, m1: 1.5, d7: 0.4 } },
+            { code: "00946", name: "群益科技高息成長", date: "2024/05/09", price: 10.50, baseYield: 6.0,  freq: "月配", schedule: "每月 (約7號除 | 月底領)", perf: { y1: 7.5, m6: 4.1, m3: 2.2, m1: 1.8, d7: 0.7 } },
+            { code: "00943", name: "兆豐電子高息等權", date: "2024/05/20", price: 15.00, baseYield: 12.0, freq: "月配", schedule: "每月 (約18號除 | 次月領)", perf: { y1: 5.2, m6: 1.5, m3: -0.5, m1: 0.8, d7: 0.2 } },
 
             // --- SECTOR / SPECIALTY ---
-            { code: "00927", name: "群益半導體收益",   date: "2023/06/06", price: 18.50, baseYield: 7.5, freq: "季配", schedule: "除:1,4,7,10 | 領:2,5,8,11" },
-            { code: "00900", name: "富邦特選高股息30", date: "2021/12/22", price: 13.50, baseYield: 7.0, freq: "季配", schedule: "除:2,5,8,11 | 領:3,6,9,12" },
-            { code: "00932", name: "兆豐永續高息等權", date: "2023/09/01", price: 16.10, baseYield: 6.0, freq: "季配", schedule: "除:2,5,8,11 | 領:3,6,9,12" },
-            { code: "00907", name: "永豐優息存股",     date: "2022/03/31", price: 15.50, baseYield: 5.5, freq: "雙月", schedule: "除:偶數月 | 領:奇數月" },
-            { code: "00731", name: "復華富時高息低波", date: "2018/05/23", price: 72.00, baseYield: 6.0, freq: "季配", schedule: "除:2,5,8,11 | 領:3,6,9,12" },
-            { code: "00701", name: "國泰股利精選30",   date: "2017/08/17", price: 25.40, baseYield: 5.0, freq: "半年", schedule: "除:4,10 | 領:5,11" },
+            { code: "00927", name: "群益半導體收益",   date: "2023/06/06", price: 18.50, baseYield: 9.7,  freq: "季配", schedule: "除:1,4,7,10 | 領:2,5,8,11", perf: { y1: 22.5, m6: 10.5, m3: 3.8, m1: 4.2, d7: 1.5 } },
+            { code: "00900", name: "富邦特選高股息30", date: "2021/12/22", price: 13.50, baseYield: 7.2,  freq: "季配", schedule: "除:2,5,8,11 | 領:3,6,9,12", perf: { y1: 11.2, m6: 3.5, m3: -2.8, m1: -0.9, d7: -0.3 } },
+            { code: "00932", name: "兆豐永續高息等權", date: "2023/09/01", price: 16.10, baseYield: 8.9,  freq: "季配", schedule: "除:2,5,8,11 | 領:3,6,9,12", perf: { y1: 6.5, m6: 2.1, m3: -1.5, m1: 0.3, d7: 0.1 } },
+            { code: "00907", name: "永豐優息存股",     date: "2022/03/31", price: 15.50, baseYield: 5.8,  freq: "雙月", schedule: "除:偶數月 | 領:奇數月", perf: { y1: 13.5, m6: 8.2, m3: 4.1, m1: 1.5, d7: 0.6 } },
+            { code: "00731", name: "復華富時高息低波", date: "2018/05/23", price: 72.00, baseYield: 6.5,  freq: "季配", schedule: "除:2,5,8,11 | 領:3,6,9,12", perf: { y1: 16.8, m6: 9.5, m3: 5.2, m1: 2.1, d7: 0.8 } },
+            { code: "00701", name: "國泰股利精選30",   date: "2017/08/17", price: 25.40, baseYield: 6.0,  freq: "半年", schedule: "除:4,10 | 領:5,11", perf: { y1: 14.2, m6: 7.8, m3: 3.5, m1: 1.2, d7: 0.4 } },
         ];
 
         const monthlyInput = document.getElementById('monthlyTarget');
@@ -176,6 +191,7 @@
         // --- Init Logic ---
         function initData() {
             etfData.forEach(etf => {
+                // Initial DPS calculation based on static price and user-corrected Yield
                 etf.dps = etf.price * (etf.baseYield / 100);
             });
         }
@@ -184,10 +200,37 @@
             return new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 0 }).format(num);
         }
 
+        function formatPerf(val) {
+            const colorClass = val > 0 ? 'text-red-600' : (val < 0 ? 'text-green-600' : 'text-gray-400');
+            const sign = val > 0 ? '+' : '';
+            return `<span class="${colorClass} font-bold">${sign}${val}%</span>`;
+        }
+
+        // --- FALLBACK SIMULATION ---
+        function simulateData(isFallback = false) {
+            etfData = etfData.map(etf => {
+                const fluctuation = (Math.random() - 0.5) * 0.015; 
+                const newPrice = etf.price * (1 + fluctuation);
+                return { ...etf, price: parseFloat(newPrice.toFixed(2)) };
+            });
+
+            const now = new Date();
+            const timeString = now.toLocaleString('zh-TW', { hour12: false });
+            
+            if (isFallback) {
+                if (updateTimeDisplay) updateTimeDisplay.textContent = `最後更新：${timeString} (模擬行情)`;
+            } else {
+                if (updateTimeDisplay) updateTimeDisplay.textContent = `最後更新：${timeString} (模擬行情)`;
+            }
+
+            calculateAndRender();
+            flashRows();
+        }
+
         // --- REAL STOCK DATA FETCHING ---
         async function fetchRealStockPrices() {
             refreshIcon.classList.add('refresh-spin');
-            updateTimeDisplay.textContent = "正在連線至證交所...";
+            if (updateTimeDisplay) updateTimeDisplay.textContent = "正在連線至證交所...";
             
             const stockCodes = etfData.map(etf => `tse_${etf.code}.tw`).join('|');
             const timestamp = new Date().getTime();
@@ -211,6 +254,7 @@
                         if (!isNaN(finalPrice)) {
                             const targetIndex = etfData.findIndex(e => e.code === code);
                             if (targetIndex !== -1) {
+                                // Update price
                                 etfData[targetIndex].price = finalPrice;
                                 updatedCount++;
                             }
@@ -219,13 +263,13 @@
 
                     const now = new Date();
                     const timeString = now.toLocaleString('zh-TW', { hour12: false });
-                    updateTimeDisplay.textContent = `最後更新：${timeString} (TWSE 真實行情)`;
+                    if (updateTimeDisplay) updateTimeDisplay.textContent = `最後更新：${timeString} (TWSE 真實行情)`;
                     calculateAndRender();
                     flashRows();
                 } 
             } catch (error) {
                 console.warn("Real fetch failed", error);
-                updateTimeDisplay.textContent = `更新失敗，目前顯示預設值 (請稍後再試)`;
+                if (updateTimeDisplay) updateTimeDisplay.textContent = `更新失敗，目前顯示預設值 (請稍後再試)`;
             } finally {
                 refreshIcon.classList.remove('refresh-spin');
             }
@@ -291,7 +335,9 @@
             const backgroundColors = [];
 
             const computedData = etfData.map(etf => {
+                // Yield is fixed based on our corrected data
                 const currentYield = etf.baseYield;
+                
                 const requiredCost = annualIncome / (etf.baseYield / 100);
                 const requiredSheets = requiredCost / (etf.price * 1000);
                 return { ...etf, currentYield, requiredSheets, requiredCost };
@@ -352,6 +398,13 @@
                     </td>
                     <td class="px-4 py-3 text-right font-mono text-blue-900 font-bold bg-gray-50">${yieldDisplay}</td>
                     
+                    <!-- Performance -->
+                    <td class="px-3 py-3 text-right font-mono border-l border-gray-200">${formatPerf(etf.perf.y1)}</td>
+                    <td class="px-3 py-3 text-right font-mono">${formatPerf(etf.perf.m6)}</td>
+                    <td class="px-3 py-3 text-right font-mono">${formatPerf(etf.perf.m3)}</td>
+                    <td class="px-3 py-3 text-right font-mono">${formatPerf(etf.perf.m1)}</td>
+                    <td class="px-3 py-3 text-right font-mono">${formatPerf(etf.perf.d7)}</td>
+
                     <td class="px-4 py-3 text-right font-mono font-bold bg-blue-50 text-blue-800 border-l border-gray-200">${sheetsDisplay}</td>
                     <td class="px-4 py-3 text-right font-mono font-bold text-blue-700 bg-blue-50">${costDisplay}</td>
                     <td class="px-4 py-3 text-right font-mono border-l border-gray-200">${nhiDisplay}</td>
