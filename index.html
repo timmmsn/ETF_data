@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台灣高股息 ETF 月領試算與比較 (2025)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 引入 Datalabels 插件 -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f0f4f8; }
+        .slider-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #3b82f6;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .refresh-spin {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .price-flash {
+            animation: flash 1s;
+        }
+        @keyframes flash {
+            0% { background-color: #d1fae5; }
+            100% { background-color: transparent; }
+        }
+        /* Custom Scrollbar for table */
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        th, td {
+            white-space: nowrap; /* Prevent text wrapping */
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-full mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold mb-1">📊 台灣高股息 ETF 月領薪水試算 (TOP 20)</h1>
+                <p class="text-blue-100 text-sm opacity-90">
+                    <span id="updateTimeDisplay">資料來源：台灣證券交易所 (TWSE)</span>
+                </p>
+            </div>
+            <button onclick="fetchRealStockPrices()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition backdrop-blur-sm text-sm border border-white/40">
+                <i id="refreshIcon" class="fas fa-sync-alt"></i>
+                更新即時股價
+            </button>
+        </div>
+
+        <div class="p-6">
+            <!-- Control Panel -->
+            <div class="mb-8 bg-blue-50 p-6 rounded-lg border border-blue-100">
+                <label for="monthlyTarget" class="block text-lg font-semibold text-gray-700 mb-4">
+                    目標每月平均被動收入：<span id="targetDisplay" class="text-3xl text-blue-600 font-bold">10,000</span> 元
+                </label>
+                <input type="range" id="monthlyTarget" min="10000" max="100000" step="5000" value="10000" 
+                       class="w-full h-3 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                <div class="flex justify-between text-sm text-gray-500 mt-2">
+                    <span>1萬</span>
+                    <span>10萬</span>
+                </div>
+                <!-- NHI Warning -->
+                <div class="mt-4 flex items-start gap-2 text-sm text-orange-700 bg-orange-100 p-3 rounded">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                    </svg>
+                    <p>
+                        <strong>二代健保提醒：</strong> 單次股利給付達 <strong>20,000</strong> 元(含)，需扣繳 <strong>2.11%</strong> 補充保費。<br>
+                        系統會根據「月配」或「季配」自動判斷單次金額是否超標。
+                    </p>
+                </div>
+            </div>
+
+            <!-- Analysis Section -->
+            <div class="grid grid-cols-1 xl:grid-cols-4 gap-8 mb-8">
+                <!-- Table (Spans 3 cols on large screens) -->
+                <div class="xl:col-span-3 overflow-hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-gray-800 border-l-4 border-blue-500 pl-3">ETF 存股成本與績效試算</h3>
+                        <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                            <i class="fas fa-info-circle mr-1"></i> 即時股價 + 歷史績效(模擬2025)
+                        </span>
+                    </div>
+                    <!-- Table Container with Horizontal Scroll -->
+                    <div class="max-h-[1000px] overflow-y-auto overflow-x-auto custom-scrollbar border rounded-lg shadow-sm">
+                        <table class="min-w-full text-sm text-left text-gray-600 relative">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0 z-10 shadow-sm font-bold">
+                                <tr>
+                                    <th class="px-4 py-3 bg-gray-100 sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">代號 / 名稱</th>
+                                    <th class="px-3 py-3 text-center bg-gray-100">上市日</th>
+                                    <th class="px-3 py-3 text-center bg-gray-100">頻率</th>
+                                    <th class="px-4 py-3 text-right bg-gray-50 text-blue-900 border-l border-gray-200">即時股價</th>
+                                    <th class="px-4 py-3 text-right bg-gray-50 text-blue-900">殖利率(估)</th>
+                                    
+                                    <!-- Performance Columns -->
+                                    <th class="px-3 py-3 text-right bg-white border-l border-gray-200">近一年</th>
+                                    <th class="px-3 py-3 text-right bg-white">近半年</th>
+                                    <th class="px-3 py-3 text-right bg-white">近一季</th>
+                                    <th class="px-3 py-3 text-right bg-white">近一月</th>
+                                    <th class="px-3 py-3 text-right bg-white">近七天</th>
+
+                                    <th class="px-4 py-3 text-right bg-blue-50 text-blue-800 border-l border-gray-200">需求張數</th>
+                                    <th class="px-4 py-3 text-right bg-blue-50 text-blue-800">預估成本</th>
+                                    <th class="px-4 py-3 text-right text-orange-600 bg-gray-100 border-l border-gray-200">二代健保(年)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="etfTableBody">
+                                <!-- Rows will be populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2" id="statusMessage">* 系統初始化中，請稍候...</p>
+                </div>
+
+                <!-- Charts (Sidebar) -->
+                <div class="xl:col-span-1 flex flex-col gap-6">
+                    <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                        <h3 class="text-lg font-bold text-gray-800 mb-2">💰 所需本金 (越低越好)</h3>
+                        <div class="relative h-[800px] w-full">
+                            <canvas id="costChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                        <h3 class="text-lg font-bold text-indigo-900 mb-2">🏆 選股指南</h3>
+                        <ul class="space-y-3 text-sm text-indigo-800">
+                            <li>
+                                <span class="font-bold bg-red-100 text-red-700 px-2 py-1 rounded text-xs">攻擊型</span> 
+                                若「近一年」漲幅高且殖利率不錯 (如 00919, 00915)，適合追求總報酬。
+                            </li>
+                            <li>
+                                <span class="font-bold bg-green-100 text-green-700 px-2 py-1 rounded text-xs">防禦型</span> 
+                                若「近一月/七天」在跌勢中抗跌 (如 00713)，適合保守資金。
+                            </li>
+                            <li>
+                                <span class="font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">現金流</span> 
+                                關注「需求張數」與「成本」，00919/00929 對小資族較友善。
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="hidden fixed inset-0 bg-gray-900/20 backdrop-blur-[2px] overflow-y-auto h-full w-full flex items-center justify-center z-50 transition-all duration-300">
+        <div class="bg-white/30 backdrop-blur-md p-6 rounded-2xl shadow-2xl w-80 relative border border-white/50 ring-1 ring-white/30">
+            <button onclick="closeModal()" class="absolute top-3 right-3 text-gray-700 hover:text-gray-900 transition-colors">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3 class="text-xl font-bold mb-4 text-gray-900 drop-shadow-sm">修改股價</h3>
+            <div class="mb-5">
+                <label class="block text-gray-900 text-sm font-bold mb-2 drop-shadow-sm" id="modalLabel">輸入新股價</label>
+                <input type="number" id="newPriceInput" step="0.01" class="shadow-inner appearance-none border border-white/60 rounded-lg w-full py-2 px-3 text-gray-900 font-bold leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500/50 bg-white/50 backdrop-blur-sm placeholder-gray-500">
+                <p class="text-xs text-gray-800 mt-3 font-medium flex items-center gap-2">
+                    <span class="bg-white/40 px-2 py-1 rounded border border-white/60 shadow-sm">Enter</span> 儲存 
+                    <span class="bg-white/40 px-2 py-1 rounded border border-white/60 shadow-sm">Esc</span> 取消
+                </p>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeModal()" class="bg-white/40 hover:bg-white/60 text-gray-900 font-medium py-1.5 px-4 rounded-lg transition-all border border-white/60 shadow-sm backdrop-blur-sm">取消</button>
+                <button onclick="savePrice()" class="bg-blue-600/80 hover:bg-blue-600 text-white font-bold py-1.5 px-4 rounded-lg transition-all shadow-md backdrop-blur-sm border border-blue-400/30">確認</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Expanded Data with Mock Performance Metrics (as historical API not available client-side)
+        // perf: { y1: year%, m6: 6month%, m3: 3month%, m1: 1month%, d7: 7day% }
+        // Note: These are simulated values for the "2025" context to show variety.
+        let etfData = [
+            // --- TOP TIER HIGH YIELD ---
+            { code: "00919", name: "群益台灣精選高息", date: "2022/10/20", price: 22.30, baseYield: 11.2, freq: "季配", tag: "高息王", perf: { y1: 18.5, m6: 5.2, m3: -1.5, m1: 2.1, d7: 0.8 } },
+            { code: "00915", name: "凱基優選高股息30", date: "2022/08/09", price: 22.50, baseYield: 11.0, freq: "季配", tag: "績效黑馬", perf: { y1: 24.2, m6: 8.9, m3: 1.2, m1: 3.5, d7: 1.2 } },
+            { code: "00918", name: "大華優利高填息30", date: "2022/11/24", price: 22.85, baseYield: 10.8, freq: "季配", tag: "高填息", perf: { y1: 20.1, m6: 6.4, m3: -0.8, m1: 1.8, d7: 0.5 } },
+            { code: "00929", name: "復華台灣科技優息", date: "2023/06/09", price: 17.73, baseYield: 10.6, freq: "月配", tag: "首檔月配", perf: { y1: 15.6, m6: 3.1, m3: -2.5, m1: -0.5, d7: -0.2 } },
+            
+            // --- CLASSIC & STEADY ---
+            { code: "0056",  name: "元大高股息",      date: "2007/12/26", price: 36.40, baseYield: 10.2, freq: "季配", tag: "老牌經典", perf: { y1: 12.8, m6: 4.5, m3: 0.5, m1: 1.2, d7: 0.3 } },
+            { code: "00713", name: "元大台灣高息低波", date: "2017/09/27", price: 50.90, baseYield: 9.1,  freq: "季配", tag: "抗跌穩健", perf: { y1: 10.5, m6: 7.2, m3: 2.8, m1: 0.9, d7: 0.1 } },
+            { code: "00878", name: "國泰永續高股息",   date: "2020/07/20", price: 21.48, baseYield: 8.4,  freq: "季配", tag: "國民ETF", perf: { y1: 9.8, m6: 2.5, m3: -1.2, m1: 0.5, d7: 0.2 } },
+            
+            // --- NEW MONTHLY DIVIDEND WAVE ---
+            { code: "00939", name: "統一台灣高息動能", date: "2024/03/20", price: 14.15, baseYield: 7.5,  freq: "月配", tag: "動能因子", perf: { y1: 4.2, m6: -1.5, m3: -3.2, m1: -1.1, d7: -0.5 } },
+            { code: "00940", name: "元大台灣價值高息", date: "2024/04/01", price: 9.22,  baseYield: 6.5,  freq: "月配", tag: "親民價", perf: { y1: -2.5, m6: -3.8, m3: -1.5, m1: 0.2, d7: 0.1 } },
+            { code: "00934", name: "中信成長高股息",   date: "2023/11/01", price: 19.20, baseYield: 8.5,  freq: "月配", tag: "成長高息", perf: { y1: 14.5, m6: 5.8, m3: 0.5, m1: 2.3, d7: 0.9 } },
+            { code: "00936", name: "台新永續高息中小", date: "2023/11/08", price: 16.30, baseYield: 7.8,  freq: "月配", tag: "中小高息", perf: { y1: 8.5, m6: -2.1, m3: -4.5, m1: -1.8, d7: -0.6 } },
+            { code: "00944", name: "野村趨勢動能高息", date: "2024/05/09", price: 15.10, baseYield: 7.2,  freq: "月配", tag: "趨勢動能", perf: { y1: 6.8, m6: 3.2, m3: 1.1, m1: 1.5, d7: 0.4 } },
+            { code: "00946", name: "群益科技高息成長", date: "2024/05/09", price: 10.50, baseYield: 7.5,  freq: "月配", tag: "科技成長", perf: { y1: 7.5, m6: 4.1, m3: 2.2, m1: 1.8, d7: 0.7 } },
+            { code: "00943", name: "兆豐電子高息等權", date: "2024/05/20", price: 15.00, baseYield: 8.0,  freq: "月配", tag: "電子等權", perf: { y1: 5.2, m6: 1.5, m3: -0.5, m1: 0.8, d7: 0.2 } },
+
+            // --- SECTOR / SPECIALTY ---
+            { code: "00927", name: "群益半導體收益",   date: "2023/06/06", price: 18.50, baseYield: 8.8,  freq: "季配", tag: "半導體息", perf: { y1: 22.5, m6: 10.5, m3: 3.8, m1: 4.2, d7: 1.5 } },
+            { code: "00900", name: "富邦特選高股息30", date: "2021/12/22", price: 13.45, baseYield: 8.9,  freq: "季配", tag: "換股積極", perf: { y1: 11.2, m6: 3.5, m3: -2.8, m1: -0.9, d7: -0.3 } },
+            { code: "00932", name: "兆豐永續高息等權", date: "2023/09/01", price: 16.20, baseYield: 6.8,  freq: "季配", tag: "ESG等權", perf: { y1: 6.5, m6: 2.1, m3: -1.5, m1: 0.3, d7: 0.1 } },
+            { code: "00907", name: "永豐優息存股",     date: "2022/03/31", price: 15.50, baseYield: 6.2,  freq: "雙月", tag: "金融傳產", perf: { y1: 13.5, m6: 8.2, m3: 4.1, m1: 1.5, d7: 0.6 } },
+            { code: "00731", name: "復華富時高息低波", date: "2018/05/23", price: 72.00, baseYield: 6.5,  freq: "季配", tag: "低波高價", perf: { y1: 16.8, m6: 9.5, m3: 5.2, m1: 2.1, d7: 0.8 } },
+            { code: "00701", name: "國泰股利精選30",   date: "2017/08/17", price: 25.40, baseYield: 5.5,  freq: "半年", tag: "低波藍籌", perf: { y1: 14.2, m6: 7.8, m3: 3.5, m1: 1.2, d7: 0.4 } },
+        ];
+
+        const monthlyInput = document.getElementById('monthlyTarget');
+        const targetDisplay = document.getElementById('targetDisplay');
+        const tableBody = document.getElementById('etfTableBody');
+        const updateTimeDisplay = document.getElementById('updateTimeDisplay');
+        const refreshIcon = document.getElementById('refreshIcon');
+        const statusMessage = document.getElementById('statusMessage');
+        const newPriceInput = document.getElementById('newPriceInput');
+        let costChart = null;
+        let currentEditCode = null;
+
+        // --- Init Logic: Calculate DPS ---
+        function initData() {
+            etfData.forEach(etf => {
+                etf.dps = etf.price * (etf.baseYield / 100);
+            });
+        }
+
+        function formatCurrency(num) {
+            return new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 0 }).format(num);
+        }
+
+        function formatPerf(val) {
+            const colorClass = val > 0 ? 'text-red-600' : (val < 0 ? 'text-green-600' : 'text-gray-400');
+            const sign = val > 0 ? '+' : '';
+            return `<span class="${colorClass} font-bold">${sign}${val}%</span>`;
+        }
+
+        // --- FALLBACK SIMULATION ---
+        function simulateData(isFallback = false) {
+            etfData = etfData.map(etf => {
+                const fluctuation = (Math.random() - 0.5) * 0.015; 
+                const newPrice = etf.price * (1 + fluctuation);
+                return { ...etf, price: parseFloat(newPrice.toFixed(2)) };
+            });
+
+            const now = new Date();
+            const timeString = now.toLocaleString('zh-TW', { hour12: false });
+            
+            if (isFallback) {
+                updateTimeDisplay.textContent = `最後更新：${timeString} (模擬行情)`;
+                statusMessage.innerHTML = `<i class="fas fa-exclamation-triangle mr-1"></i> 連線證交所不穩，目前切換至模擬報價。`;
+                statusMessage.className = "text-xs text-orange-600 mt-2 font-bold";
+            } else {
+                updateTimeDisplay.textContent = `最後更新：${timeString} (模擬行情)`;
+            }
+
+            calculateAndRender();
+            flashRows();
+        }
+
+        // --- REAL STOCK DATA FETCHING ---
+        async function fetchRealStockPrices() {
+            refreshIcon.classList.add('refresh-spin');
+            updateTimeDisplay.textContent = "正在連線至證交所...";
+            statusMessage.textContent = "* 正在透過安全通道請求真實股價...";
+            statusMessage.className = "text-xs text-blue-600 mt-2 font-bold";
+
+            const stockCodes = etfData.map(etf => `tse_${etf.code}.tw`).join('|');
+            const timestamp = new Date().getTime();
+            const twseUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=${stockCodes}&json=1&delay=0&t=${timestamp}`;
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(twseUrl)}`;
+
+            try {
+                const response = await fetch(proxyUrl, { signal: AbortSignal.timeout(6000) });
+                if (!response.ok) throw new Error("Proxy Error");
+                
+                const data = await response.json();
+                
+                if (data.msgArray && data.msgArray.length > 0) {
+                    let updatedCount = 0;
+                    data.msgArray.forEach(item => {
+                        const code = item.c;
+                        let price = item.z;
+                        if (!price || price === '-' || parseFloat(price) === 0) price = item.y;
+                        
+                        const finalPrice = parseFloat(price);
+                        if (!isNaN(finalPrice)) {
+                            const targetIndex = etfData.findIndex(e => e.code === code);
+                            if (targetIndex !== -1) {
+                                etfData[targetIndex].price = finalPrice;
+                                updatedCount++;
+                            }
+                        }
+                    });
+
+                    const now = new Date();
+                    const timeString = now.toLocaleString('zh-TW', { hour12: false });
+                    updateTimeDisplay.textContent = `最後更新：${timeString} (TWSE 真實行情)`;
+                    statusMessage.textContent = `* 已成功更新 ${updatedCount} 檔 ETF 即時股價`;
+                    statusMessage.className = "text-xs text-green-600 mt-2 font-bold";
+                    calculateAndRender();
+                    flashRows();
+                    
+                } else {
+                    throw new Error("Empty Data");
+                }
+            } catch (error) {
+                console.warn("Real fetch failed, switching to simulation:", error);
+                simulateData(true);
+            } finally {
+                refreshIcon.classList.remove('refresh-spin');
+            }
+        }
+
+        function flashRows() {
+            const rows = document.querySelectorAll('#etfTableBody tr');
+            rows.forEach(row => {
+                row.classList.remove('price-flash');
+                void row.offsetWidth; // Trigger reflow
+                row.classList.add('price-flash');
+            });
+        }
+
+        // --- Edit Modal Functions ---
+        function openEditModal(code, currentPrice) {
+            currentEditCode = code;
+            document.getElementById('modalLabel').textContent = `修改 ${code} 股價`;
+            newPriceInput.value = currentPrice;
+            document.getElementById('editModal').classList.remove('hidden');
+            setTimeout(() => { newPriceInput.focus(); newPriceInput.select(); }, 50);
+        }
+
+        function closeModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        function savePrice() {
+            const newPrice = parseFloat(newPriceInput.value);
+            if (newPrice && newPrice > 0) {
+                const index = etfData.findIndex(e => e.code === currentEditCode);
+                if (index !== -1) {
+                    etfData[index].price = newPrice;
+                    calculateAndRender();
+                    closeModal();
+                    flashRows();
+                }
+            }
+        }
+
+        newPriceInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') { event.preventDefault(); savePrice(); } 
+            else if (event.key === 'Escape') { event.preventDefault(); closeModal(); }
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && !document.getElementById('editModal').classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+
+        // --- Calculation & Rendering ---
+        function calculateAndRender() {
+            const monthlyIncome = parseInt(monthlyInput.value);
+            const annualIncome = monthlyIncome * 12;
+            targetDisplay.textContent = formatCurrency(monthlyIncome);
+
+            tableBody.innerHTML = '';
+            
+            const labels = [];
+            const costs = [];
+            const backgroundColors = [];
+
+            const computedData = etfData.map(etf => {
+                const currentYield = (etf.dps / etf.price) * 100;
+                const requiredSheets = annualIncome / etf.dps / 1000;
+                const requiredCost = requiredSheets * 1000 * etf.price;
+                return { ...etf, currentYield, requiredSheets, requiredCost };
+            });
+
+            // Sort by lowest cost first
+            const sortedData = computedData.sort((a, b) => b.currentYield - a.currentYield);
+
+            sortedData.forEach((etf, index) => {
+                let paymentCount = etf.freq === '月配' ? 12 : (etf.freq === '雙月' ? 6 : (etf.freq === '半年' ? 2 : 4));
+                let singlePaymentAmount = annualIncome / paymentCount;
+                let nhiFee = singlePaymentAmount >= 20000 ? annualIncome * 0.0211 : 0;
+                
+                labels.push(etf.code);
+                costs.push(etf.requiredCost);
+                if (index < 3) backgroundColors.push('rgba(239, 68, 68, 0.7)'); 
+                else backgroundColors.push('rgba(59, 130, 246, 0.5)'); 
+
+                const row = document.createElement('tr');
+                row.className = "border-b border-gray-200 hover:bg-gray-50 transition";
+                
+                let nhiDisplay = nhiFee > 0 
+                    ? `<span class="text-orange-600 font-bold text-xs md:text-sm">${formatCurrency(nhiFee)}</span>` 
+                    : `<span class="text-gray-300 text-xs md:text-sm">0</span>`;
+                
+                let freqClass = 'bg-green-100 text-green-800'; 
+                if (etf.freq === '月配') freqClass = 'bg-purple-100 text-purple-800';
+                if (etf.freq === '雙月') freqClass = 'bg-yellow-100 text-yellow-800';
+                if (etf.freq === '半年') freqClass = 'bg-gray-200 text-gray-700';
+
+                row.innerHTML = `
+                    <td class="px-4 py-3 font-medium text-gray-900 sticky left-0 bg-white z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                        <div class="flex flex-col">
+                            <span class="text-xs text-gray-500">${etf.code}</span>
+                            <span>${etf.name}</span>
+                            <span class="md:hidden text-[10px] text-gray-400">${etf.tag}</span>
+                        </div>
+                    </td>
+                    <td class="px-3 py-3 text-center">
+                        <span class="block text-xs text-gray-500 font-mono">${etf.date}</span>
+                    </td>
+                    <td class="px-3 py-3 text-center">
+                        <span class="px-2 py-1 rounded text-xs ${freqClass}">
+                            ${etf.freq}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-right font-mono group relative bg-gray-50 text-blue-900 font-bold border-l border-gray-200">
+                        ${etf.price.toFixed(2)}
+                        <button onclick="openEditModal('${etf.code}', ${etf.price})" class="ml-2 text-gray-300 hover:text-blue-500 transition">
+                            <i class="fas fa-pencil-alt text-xs"></i>
+                        </button>
+                    </td>
+                    <td class="px-4 py-3 text-right font-mono text-blue-900 font-bold bg-gray-50">${etf.currentYield.toFixed(1)}%</td>
+                    
+                    <!-- Performance -->
+                    <td class="px-3 py-3 text-right font-mono border-l border-gray-200">${formatPerf(etf.perf.y1)}</td>
+                    <td class="px-3 py-3 text-right font-mono">${formatPerf(etf.perf.m6)}</td>
+                    <td class="px-3 py-3 text-right font-mono">${formatPerf(etf.perf.m3)}</td>
+                    <td class="px-3 py-3 text-right font-mono">${formatPerf(etf.perf.m1)}</td>
+                    <td class="px-3 py-3 text-right font-mono">${formatPerf(etf.perf.d7)}</td>
+
+                    <td class="px-4 py-3 text-right font-mono font-bold bg-blue-50 text-blue-800 border-l border-gray-200">${etf.requiredSheets.toFixed(1)} 張</td>
+                    <td class="px-4 py-3 text-right font-mono font-bold text-blue-700 bg-blue-50">${formatCurrency(etf.requiredCost)}</td>
+                    <td class="px-4 py-3 text-right font-mono border-l border-gray-200">${nhiDisplay}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            updateChart(labels, costs, backgroundColors);
+        }
+
+        function updateChart(labels, costs, colors) {
+            const ctx = document.getElementById('costChart').getContext('2d');
+            if (costChart) costChart.destroy();
+
+            costChart = new Chart(ctx, {
+                type: 'bar',
+                plugins: [ChartDataLabels],
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '所需本金 (元)',
+                        data: costs,
+                        backgroundColor: colors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    layout: {
+                        padding: {
+                            right: 60 // Add space for labels
+                        }
+                    },
+                    indexAxis: 'y', 
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { display: false },
+                        datalabels: { // Config
+                            color: '#4b5563', // gray-600
+                            anchor: 'end',
+                            align: 'end',
+                            formatter: function(value) {
+                                return Math.round(value / 10000) + '萬';
+                            },
+                            font: {
+                                weight: 'bold',
+                                size: 11
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { callback: function(value) { return (value / 10000) + '萬'; } }
+                        }
+                    }
+                }
+            });
+        }
+
+        monthlyInput.addEventListener('input', calculateAndRender);
+        document.addEventListener('DOMContentLoaded', () => {
+            initData();
+            calculateAndRender();
+            fetchRealStockPrices();
+        });
+
+    </script>
+</body>
+</html>
